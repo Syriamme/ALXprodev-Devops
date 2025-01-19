@@ -1,46 +1,41 @@
 #!/bin/bash
 
-# Define the directory where the Pokémon JSON files are stored
-POKEMON_DIR="."
+# Directory where the Pokémon JSON files are stored (make sure to set this correctly)
+POKEMON_DIR="./"
 
 # Output CSV file
-OUTPUT_CSV="pokemon_report.csv"
+OUTPUT_CSV="pokemon_summary.csv"
 
-# Initialize variables to calculate the averages
-total_height=0
-total_weight=0
-pokemon_count=0
+# Temporary files to store heights and weights for average calculation
+TEMP_HEIGHTS="heights.txt"
+TEMP_WEIGHTS="weights.txt"
 
-# Create or overwrite the CSV file and add the header
-echo "Name,Height( meters),Weight( kg)" > "$OUTPUT_CSV"
+# Initialize CSV file with headers
+echo "Name,Height,Weight" > "$OUTPUT_CSV"
 
-# Loop through each JSON file in the directory
-for pokemon_file in $POKEMON_DIR/*.json; do
-    # Extract the name, height, and weight using jq
-    name=$(jq -r '.name' "$pokemon_file")
-    height=$(jq -r '.height' "$pokemon_file")
-    weight=$(jq -r '.weight' "$pokemon_file")
+# Loop through all the JSON files in the directory
+for json_file in "$POKEMON_DIR"*.json; do
+    # Extract the Pokémon name, height, and weight using jq
+    name=$(jq -r '.name' "$json_file")
+    height=$(jq -r '.height' "$json_file")
+    weight=$(jq -r '.weight' "$json_file")
 
-    # Convert height and weight to meters and kilograms (divide by 10)
-    formatted_height=$(echo "$height / 10" | bc -l)
-    formatted_weight=$(echo "$weight / 10" | bc -l)
+    # Add the extracted data to the CSV file
+    echo "$name,$height,$weight" >> "$OUTPUT_CSV"
 
-    # Append the data to the CSV file
-    echo "$name,$formatted_height,$formatted_weight" >> "$OUTPUT_CSV"
-
-    # Update the total height and weight for calculating the averages
-    total_height=$(echo "$total_height + $formatted_height" | bc -l)
-    total_weight=$(echo "$total_weight + $formatted_weight" | bc -l)
-    pokemon_count=$((pokemon_count + 1))
+    # Save height and weight for calculating averages later
+    echo "$height" >> "$TEMP_HEIGHTS"
+    echo "$weight" >> "$TEMP_WEIGHTS"
 done
 
-# Calculate the averages using awk
-average_height=$(echo "$total_height / $pokemon_count" | bc -l)
-average_weight=$(echo "$total_weight / $pokemon_count" | bc -l)
+# Calculate average height and weight using awk
+average_height=$(awk '{ total += $1; count++ } END { print total / count }' "$TEMP_HEIGHTS")
+average_weight=$(awk '{ total += $1; count++ } END { print total / count }' "$TEMP_WEIGHTS")
 
-# Add the averages to the report
-echo "Average Height (meters),$average_height" >> "$OUTPUT_CSV"
-echo "Average Weight (kg),$average_weight" >> "$OUTPUT_CSV"
+# Append the averages to the CSV file
+echo "Average,$average_height,$average_weight" >> "$OUTPUT_CSV"
 
-# Print success message
+# Clean up temporary files
+rm "$TEMP_HEIGHTS" "$TEMP_WEIGHTS"
+
 echo "Report generated: $OUTPUT_CSV"
