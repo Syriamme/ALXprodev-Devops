@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# Define the API endpoint and file paths
+URL="https://pokeapi.co/api/v2/pokemon/pikachu"
+SUCCESS_FILE="data.json"
+ERROR_FILE="errors.txt"
+
+# Make the API request
+response=$(curl --write-out "%{http_code}" --silent --output temp_response.json $URL)
+
+# Check if the response was successful (HTTP status code 200)
+if [ "$response" -eq 200 ]; then
+    # Save the successful response to data.json
+    mv temp_response.json $SUCCESS_FILE
+    echo "Request successful. Data saved to $SUCCESS_FILE"
+else
+    # If the request fails, log the error to errors.txt
+    echo "Error: HTTP $response - Request to $URL failed." >> $ERROR_FILE
+    echo "Error details saved to $ERROR_FILE"
+    rm temp_response.json
+fi
