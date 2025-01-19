@@ -1,47 +1,43 @@
 #!/bin/bash
 
-# Directory for JSON files and output
+# Directory where the Pokémon JSON files are stored
 DIRECTORY="Advanced_shell"
-OUTPUT_FILE="$DIRECTORY/pokemon_report.csv"
 
-# Check if the directory exists
-if [[ ! -d "$DIRECTORY" ]]; then
-  echo "Error: Directory $DIRECTORY does not exist."
-  exit 1
-fi
+# Output CSV file
+OUTPUT_FILE="pokemon_report.csv"
 
-# Header for the CSV file
-echo "Name,Height (m),Weight (kg)" > "$OUTPUT_FILE"
+# Initialize CSV file with headers
+echo "Name,Height,Weight" > "$OUTPUT_FILE"
 
-# Initialize counters for averages
-TOTAL_HEIGHT=0
-TOTAL_WEIGHT=0
-POKEMON_COUNT=0
+# Variables to calculate the sum of height and weight
+total_height=0
+total_weight=0
+count=0
 
-# Loop through all JSON files in the directory
-for JSON_FILE in "$DIRECTORY"/*.json; do
-  if [[ -f "$JSON_FILE" ]]; then
-    # Extract data from JSON using jq
-    NAME=$(jq -r '.name' "$JSON_FILE" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')
-    HEIGHT=$(jq -r '.height' "$JSON_FILE" | awk '{printf "%.1f", $1 / 10}') # Convert to meters
-    WEIGHT=$(jq -r '.weight' "$JSON_FILE" | awk '{printf "%.0f", $1 / 10}') # Convert to kilograms
+# Loop through each JSON file in the directory
+for file in "$DIRECTORY"/*.json; do
+  # Extract name, height, and weight from the JSON file using jq
+  name=$(jq -r '.name' "$file")
+  height=$(jq -r '.height' "$file")
+  weight=$(jq -r '.weight' "$file")
 
-    # Add data to the CSV file
-    echo "$NAME,$HEIGHT,$WEIGHT" >> "$OUTPUT_FILE"
+  # Convert height and weight from decimeters and hectograms to meters and kilograms
+  height_in_meters=$(echo "$height / 10" | bc -l)
+  weight_in_kg=$(echo "$weight / 10" | bc -l)
 
-    # Accumulate totals
-    TOTAL_HEIGHT=$(echo "$TOTAL_HEIGHT + $HEIGHT" | bc)
-    TOTAL_WEIGHT=$(echo "$TOTAL_WEIGHT + $WEIGHT" | bc)
-    POKEMON_COUNT=$((POKEMON_COUNT + 1))
-  fi
+  # Append the extracted data to the CSV file
+  echo "$name,$height_in_meters,$weight_in_kg" >> "$OUTPUT_FILE"
+
+  # Add the height and weight to the totals
+  total_height=$(echo "$total_height + $height_in_meters" | bc -l)
+  total_weight=$(echo "$total_weight + $weight_in_kg" | bc -l)
+  count=$((count + 1))
 done
 
 # Calculate averages using awk
-if [[ "$POKEMON_COUNT" -gt 0 ]]; then
-  AVERAGE_HEIGHT=$(echo "$TOTAL_HEIGHT / $POKEMON_COUNT" | bc -l | awk '{printf "%.2f", $1}')
-  AVERAGE_WEIGHT=$(echo "$TOTAL_WEIGHT / $POKEMON_COUNT" | bc -l | awk '{printf "%.2f", $1}')
-  echo "Average Height (m),Average Weight (kg)" >> "$OUTPUT_FILE"
-  echo "$AVERAGE_HEIGHT,$AVERAGE_WEIGHT" >> "$OUTPUT_FILE"
-fi
+average_height=$(echo "scale=2; $total_height / $count" | bc)
+average_weight=$(echo "scale=2; $total_weight / $count" | bc)
 
-echo "Summary report generated: $OUTPUT_FILE"
+# Output the average height and weight
+echo "Average Height: $average_height meters"
+echo "Average Weight: $average_weight kg"
