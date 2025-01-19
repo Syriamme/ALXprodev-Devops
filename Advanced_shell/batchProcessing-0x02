@@ -1,32 +1,82 @@
 #!/bin/bash
 
-# List of Pokémon
-POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+# Define the directory where the Pokémon JSON files are stored
+POKEMON_DIR="."
 
-# API base URL
-API_URL="https://pokeapi.co/api/v2/pokemon"
+# Output CSV file
+OUTPUT_CSV="pokemon_report.csv"
 
-# Function to fetch data for a Pokémon
+# Initialize variables to calculate the averages
+total_height=0
+total_weight=0
+pokemon_count=0
+
+# Create or overwrite the CSV file and add the header
+echo "Name,Height( meters),Weight( kg)" > "$OUTPUT_CSV"
+
+# Retry function for API requests (up to 3 attempts)
 fetch_pokemon_data() {
-    pokemon=$1
-    file_name="${pokemon}.json"
-    
-    # Make the API request and save the data to a file
-    response=$(curl --write-out "%{http_code}" --silent --output "$file_name" "$API_URL/$pokemon")
+    pokemon_file=$1
+    attempts=0
+    success=0
 
-    # Check if the request was successful (HTTP status code 200)
-    if [ "$response" -eq 200 ]; then
-        echo "Data for $pokemon saved to $file_name"
-    else
-        echo "Error: HTTP $response - Failed to fetch data for $pokemon"
+    # Attempt to extract data up to 3 times
+    while [ $attempts -lt 3 ]; do
+        # Try to extract the data using jq
+        name=$(jq -r '.name' "$pokemon_file" 2>/dev/null)
+        height=$(jq -r '.height' "$pokemon_file" 2>/dev/null)
+        weight=$(jq -r '.weight' "$pokemon_file" 2>/dev/null)
+
+        # Check if extraction is successful (non-empty values)
+        if [ -n "$name" ] && [ -n "$height" ] && [ -n "$weight" ]; then
+            success=1
+            break
+        else
+            attempts=$((attempts + 1))
+            echo "Attempt $attempts failed for $pokemon_file. Retrying..."
+            sleep 2  # Wait before retrying
+        fi
+    done
+
+    # If request fails 3 times, log error and skip this Pokémon
+    if [ $success -eq 0 ]; then
+        echo "Error: Failed to extract data for $pokemon_file after 3 attempts." >> errors.txt
+        return 1  # Return failure
     fi
+    return 0  # Return success
 }
 
-# Loop through the list of Pokémon
-for pokemon in "${POKEMON_LIST[@]}"; do
-    # Fetch data for each Pokémon and save it to a separate file
-    fetch_pokemon_data "$pokemon"
-    
-    # Delay of 2 seconds between requests to handle rate-limiting
-    sleep 2
+# Loop through each JSON file in the directory
+for pokemon_file in $POKEMON_DIR/*.json; do
+    # Fetch data for the Pokémon (retry if necessary)
+    if ! fetch_pokemon_data "$pokemon_file"; then
+        continue  # Skip to next Pokémon if data extraction failed
+    fi
+
+    # Convert height and weight to meters and kilograms (divide by 10)
+    formatted_height=$(echo "$height / 10" | bc -l)
+    formatted_weight=$(echo "$weight / 10" | bc -l)
+
+    # Append the data to the CSV file
+    echo "$name,$formatted_height,$formatted_weight" >> "$OUTPUT_CSV"
+
+    # Update the total height and weight for calculating the averages
+    total_height=$(echo "$total_height + $formatted_height" | bc -l)
+    total_weight=$(echo "$total_weight + $formatted_weight" | bc -l)
+    pokemon_count=$((pokemon_count + 1))
 done
+
+# Calculate the averages using bc
+if [ $pokemon_count -gt 0 ]; then
+    average_height=$(echo "$total_height / $pokemon_count" | bc -l)
+    average_weight=$(echo "$total_weight / $pokemon_count" | bc -l)
+
+    # Add the averages to the report
+    echo "Average Height (meters),$average_height" >> "$OUTPUT_CSV"
+    echo "Average Weight (kg),$average_weight" >> "$OUTPUT_CSV"
+else
+    echo "No data available to calculate averages." >> "$OUTPUT_CSV"
+fi
+
+# Print success message
+echo "Report generated: $OUTPUT_CSV"
