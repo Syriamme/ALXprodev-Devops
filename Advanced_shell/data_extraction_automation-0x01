@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Define the input file (data.json)
+INPUT_FILE="data.json"
+
+# Check if the data file exists
+if [ ! -f "$INPUT_FILE" ]; then
+    echo "Error: $INPUT_FILE not found."
+    exit 1
+fi
+
+# Extract data using jq, awk, and sed
+name=$(jq -r '.name' $INPUT_FILE)
+height=$(jq -r '.height' $INPUT_FILE)
+weight=$(jq -r '.weight' $INPUT_FILE)
+type=$(jq -r '.types[0].type.name' $INPUT_FILE)
+
+# Format the output using awk and sed
+formatted_output=$(echo "$name is of type $type, weighs $(echo "$weight" | awk '{print $1/10 "kg"}'), and is $(echo "$height" | awk '{print $1/10 "m"}') tall." | sed 's/\./\./')
+
+# Print the result
+echo "$formatted_output"
