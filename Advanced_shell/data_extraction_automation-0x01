@@ -9,15 +9,15 @@ if [ ! -f "$INPUT_FILE" ]; then
     exit 1
 fi
 
-# Extract data using jq
+# Extract data using jq, awk, and sed
 name=$(jq -r '.name' $INPUT_FILE)
 height=$(jq -r '.height' $INPUT_FILE)
 weight=$(jq -r '.weight' $INPUT_FILE)
 type=$(jq -r '.types[0].type.name' $INPUT_FILE)
 
-# Format height and weight (converted to meters and kilograms)
-formatted_height=$(echo "$height" | awk '{print $1/10}')
+# Format the output using awk and sed
 formatted_weight=$(echo "$weight" | awk '{print $1/10}')
+formatted_height=$(echo "$height" | awk '{print $1/10}')
 
-# Output the formatted result
+# Print the result in the required format
 echo "$name is of type $type, weighs ${formatted_weight}kg, and is ${formatted_height}m tall."
