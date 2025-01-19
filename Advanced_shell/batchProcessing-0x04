@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# List of Pokémon to fetch data for
+# List of Pokémon names to fetch data for
 POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Function to fetch Pokémon data
+# Function to fetch Pokémon data and save to a file
 fetch_pokemon_data() {
   POKEMON_NAME=$1
   API_URL="https://pokeapi.co/api/v2/pokemon/$POKEMON_NAME"
   OUTPUT_FILE="${POKEMON_NAME}.json"
   
-  # Fetch data and save it to a JSON file
+  # Make the API request and save the result to a file
   curl -s $API_URL -o $OUTPUT_FILE
   
   # Check if the request was successful
@@ -20,9 +20,12 @@ fetch_pokemon_data() {
   fi
 }
 
-# Fetch data for each Pokémon in parallel using background processes
+# Start fetching data for each Pokémon in parallel using background processes
 for POKEMON in "${POKEMON_LIST[@]}"; do
-  fetch_pokemon_data $POKEMON &  # Run the fetch_pokemon_data function in the background
+  fetch_pokemon_data $POKEMON &  # Run the function in the background
+  PID=$!  # Get the Process ID of the background job
+  jobs -p  # List all background job PIDs (for monitoring purposes)
+  echo "Started fetching data for $POKEMON with PID $PID"
 done
 
 # Wait for all background processes to complete
@@ -30,3 +33,8 @@ wait
 
 # Print a message when all processes have finished
 echo "All Pokémon data retrieval processes have completed."
+
+# Optionally, kill all background jobs if necessary (e.g., in case of a script termination)
+for job in $(jobs -p); do
+  kill $job 2>/dev/null  # Kill the job silently if still running
+done
