@@ -9,11 +9,6 @@ OUTPUT_FILE="pokemon_report.csv"
 # Initialize CSV file with headers
 echo "Name,Height,Weight" > "$OUTPUT_FILE"
 
-# Variables to calculate the sum of height and weight
-total_height=0
-total_weight=0
-count=0
-
 # Loop through each JSON file in the directory
 for file in "$DIRECTORY"/*.json; do
   # Extract name, height, and weight from the JSON file using jq
@@ -27,17 +22,31 @@ for file in "$DIRECTORY"/*.json; do
 
   # Append the extracted data to the CSV file
   echo "$name,$height_in_meters,$weight_in_kg" >> "$OUTPUT_FILE"
-
-  # Add the height and weight to the totals
-  total_height=$(echo "$total_height + $height_in_meters" | bc -l)
-  total_weight=$(echo "$total_weight + $weight_in_kg" | bc -l)
-  count=$((count + 1))
 done
 
-# Calculate averages using awk
-average_height=$(echo "scale=2; $total_height / $count" | bc)
-average_weight=$(echo "scale=2; $total_weight / $count" | bc)
+# Calculate average height and weight using awk
+average_data=$(awk -F, '
+BEGIN {
+    height_sum = 0;
+    weight_sum = 0;
+    count = 0;
+}
+NR > 1 {
+    height_sum += $2;
+    weight_sum += $3;
+    count++;
+}
+END {
+    if (count > 0) {
+        avg_height = height_sum / count;
+        avg_weight = weight_sum / count;
+        print avg_height "," avg_weight;
+    }
+}
+' "$OUTPUT_FILE")
+
+# Use sed to format the result with two decimal places
+formatted_data=$(echo "$average_data" | sed 's/\./& /' | awk '{printf "Average Height: %.2f meters\nAverage Weight: %.2f kg\n", $1, $2}')
 
 # Output the average height and weight
-echo "Average Height: $average_height meters"
-echo "Average Weight: $average_weight kg"
+echo "$formatted_data"
