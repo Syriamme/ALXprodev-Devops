@@ -16,29 +16,35 @@ MAX_RETRIES=3
 # Function to fetch Pokémon data
 fetch_pokemon_data() {
   POKEMON=$1
-  POKEMON_LOWER=$(echo "$POKEMON" | tr '[:upper:]' '[:lower:]')  # Convert Pokémon name to lowercase
+  POKEMON_LOWER=$(echo "$POKEMON" | awk '{print tolower($0)}')
   DATA_FILE="$DIRECTORY/${POKEMON_LOWER}.json"
 
   RETRIES=0
+  SUCCESS=0
 
-  # Retry mechanism
-  until [[ $RETRIES -ge $MAX_RETRIES ]]; do
+  while [[ $RETRIES -lt $MAX_RETRIES ]]; do
+    # Fetch the Pokémon data from the API
     RESPONSE=$(curl -s -w "%{http_code}" -o "$DATA_FILE" "$API_BASE_URL/$POKEMON_LOWER")
     HTTP_STATUS="${RESPONSE: -3}"
 
+    # Check if the request was successful
     if [[ "$HTTP_STATUS" -eq 200 ]]; then
       echo "Data for $POKEMON saved to $DATA_FILE."
-      return 0  # Success
+      SUCCESS=1
+      break
+    else
+      echo "Attempt $(($RETRIES + 1)) failed for $POKEMON. HTTP Status: $HTTP_STATUS"
+      ((RETRIES++))
+      sleep 2
     fi
-
-    echo "Attempt $(($RETRIES + 1)) failed for $POKEMON. HTTP Status: $HTTP_STATUS"
-    ((RETRIES++))
-    sleep 2
   done
 
-  echo "Failed to fetch data for $POKEMON after $MAX_RETRIES attempts."
-  echo "$POKEMON: Failed after $MAX_RETRIES attempts" >> "$DIRECTORY/errors.txt"
-  rm -f "$DATA_FILE"  # Remove incomplete file
+  # If the request was unsuccessful after max retries, log the error
+  if [[ $SUCCESS -ne 1 ]]; then
+    echo "Failed to fetch data for $POKEMON after $MAX_RETRIES attempts."
+    echo "$POKEMON: Failed after $MAX_RETRIES attempts" >> "$DIRECTORY/errors.txt"
+    rm -f "$DATA_FILE"  # Clean up partial files
+  fi
 }
 
 # Main script execution
