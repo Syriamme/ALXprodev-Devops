@@ -16,32 +16,29 @@ MAX_RETRIES=3
 # Function to fetch Pokémon data
 fetch_pokemon_data() {
   POKEMON=$1
-  POKEMON_LOWER=$(echo "$POKEMON" | awk '{print tolower($0)}')
+  POKEMON_LOWER=$(echo "$POKEMON" | tr '[:upper:]' '[:lower:]')  # Convert Pokémon name to lowercase
   DATA_FILE="$DIRECTORY/${POKEMON_LOWER}.json"
 
   RETRIES=0
-  SUCCESS=0
 
-  while [[ $RETRIES -lt $MAX_RETRIES ]]; do
+  # Retry mechanism
+  until [[ $RETRIES -ge $MAX_RETRIES ]]; do
     RESPONSE=$(curl -s -w "%{http_code}" -o "$DATA_FILE" "$API_BASE_URL/$POKEMON_LOWER")
     HTTP_STATUS="${RESPONSE: -3}"
 
     if [[ "$HTTP_STATUS" -eq 200 ]]; then
       echo "Data for $POKEMON saved to $DATA_FILE."
-      SUCCESS=1
-      break
-    else
-      echo "Attempt $(($RETRIES + 1)) failed for $POKEMON. HTTP Status: $HTTP_STATUS"
-      ((RETRIES++))
-      sleep 2
+      return 0  # Success
     fi
+
+    echo "Attempt $(($RETRIES + 1)) failed for $POKEMON. HTTP Status: $HTTP_STATUS"
+    ((RETRIES++))
+    sleep 2
   done
 
-  if [[ $SUCCESS -ne 1 ]]; then
-    echo "Failed to fetch data for $POKEMON after $MAX_RETRIES attempts."
-    echo "$POKEMON: Failed after $MAX_RETRIES attempts" >> "$DIRECTORY/errors.txt"
-    rm -f "$DATA_FILE"
-  fi
+  echo "Failed to fetch data for $POKEMON after $MAX_RETRIES attempts."
+  echo "$POKEMON: Failed after $MAX_RETRIES attempts" >> "$DIRECTORY/errors.txt"
+  rm -f "$DATA_FILE"  # Remove incomplete file
 }
 
 # Main script execution
@@ -49,10 +46,14 @@ echo "Starting parallel data retrieval..."
 
 # Start fetching data for each Pokémon in the background
 for POKEMON in "${POKEMON_LIST[@]}"; do
-  fetch_pokemon_data "$POKEMON" &
+  fetch_pokemon_data "$POKEMON" &   # Fetch Pokémon data in background
+  PID=$!                            # Get the process ID of the background process
+  JOBS+=($PID)                      # Store the PID for process management
 done
 
 # Wait for all background processes to complete
-wait
+for PID in "${JOBS[@]}"; do
+  wait $PID                         # Wait for each background process to finish
+done
 
 echo "Parallel data retrieval complete."
