@@ -1,59 +1,32 @@
 #!/bin/bash
 
-# Directory for storing data files
-DIRECTORY="Advanced_shell"
-mkdir -p "$DIRECTORY"
-
-# List of Pokémon to fetch
-POKEMON_LIST=("Bulbasaur" "Ivysaur" "Venusaur" "Charmander" "Charmeleon")
-
-# Base API URL
-API_BASE_URL="https://pokeapi.co/api/v2/pokemon"
-
-# Max retries
-MAX_RETRIES=3
+# List of Pokémon to fetch data for
+POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
 # Function to fetch Pokémon data
 fetch_pokemon_data() {
-  POKEMON=$1
-  POKEMON_LOWER=$(echo "$POKEMON" | tr '[:upper:]' '[:lower:]')  # Convert Pokémon name to lowercase
-  DATA_FILE="$DIRECTORY/${POKEMON_LOWER}.json"
-
-  RETRIES=0
-
-  # Retry mechanism
-  until [[ $RETRIES -ge $MAX_RETRIES ]]; do
-    RESPONSE=$(curl -s -w "%{http_code}" -o "$DATA_FILE" "$API_BASE_URL/$POKEMON_LOWER")
-    HTTP_STATUS="${RESPONSE: -3}"
-
-    if [[ "$HTTP_STATUS" -eq 200 ]]; then
-      echo "Data for $POKEMON saved to $DATA_FILE."
-      return 0  # Success
-    fi
-
-    echo "Attempt $(($RETRIES + 1)) failed for $POKEMON. HTTP Status: $HTTP_STATUS"
-    ((RETRIES++))
-    sleep 2
-  done
-
-  echo "Failed to fetch data for $POKEMON after $MAX_RETRIES attempts."
-  echo "$POKEMON: Failed after $MAX_RETRIES attempts" >> "$DIRECTORY/errors.txt"
-  rm -f "$DATA_FILE"  # Remove incomplete file
+  POKEMON_NAME=$1
+  API_URL="https://pokeapi.co/api/v2/pokemon/$POKEMON_NAME"
+  OUTPUT_FILE="${POKEMON_NAME}.json"
+  
+  # Fetch data and save it to a JSON file
+  curl -s $API_URL -o $OUTPUT_FILE
+  
+  # Check if the request was successful
+  if [ $? -eq 0 ]; then
+    echo "Successfully fetched data for $POKEMON_NAME"
+  else
+    echo "Error fetching data for $POKEMON_NAME" >> errors.txt
+  fi
 }
 
-# Main script execution
-echo "Starting parallel data retrieval..."
-
-# Start fetching data for each Pokémon in the background
+# Fetch data for each Pokémon in parallel using background processes
 for POKEMON in "${POKEMON_LIST[@]}"; do
-  fetch_pokemon_data "$POKEMON" &   # Fetch Pokémon data in background
-  PID=$!                            # Get the process ID of the background process
-  JOBS+=($PID)                      # Store the PID for process management
+  fetch_pokemon_data $POKEMON &  # Run the fetch_pokemon_data function in the background
 done
 
 # Wait for all background processes to complete
-for PID in "${JOBS[@]}"; do
-  wait $PID                         # Wait for each background process to finish
-done
+wait
 
-echo "Parallel data retrieval complete."
+# Print a message when all processes have finished
+echo "All Pokémon data retrieval processes have completed."
